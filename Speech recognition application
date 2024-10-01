@@ -1,0 +1,82 @@
+import os
+import streamlit as st
+import speech_recognition as sr
+from gtts import gTTS
+from io import BytesIO
+from langchain_groq import ChatGroq
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.output_parsers import StrOutputParser
+from dotenv import load_dotenv
+
+def load_environment():
+    return "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"
+
+def initialize_model(api_key):
+    return ChatGroq(model="llama3-8b-8192", api_key=api_key)
+
+def create_translation_chain(model):
+    prompt = ChatPromptTemplate.from_messages([
+        ("system", "Translate the following input from {input_language} to {output_language}"),
+        ("user", "{text}")
+    ])
+    return prompt | model | StrOutputParser()
+
+def translate_text(chain, text, input_lang, output_lang):
+    return chain.invoke({"input_language": input_lang, "output_language": output_lang, "text": text})
+
+def text_to_speech(text, lang):
+    tts = gTTS(text=text, lang=lang)
+    fp = BytesIO()
+    tts.write_to_fp(fp)
+    return fp
+
+def recognize_speech(recognizer, source):
+    audio = recognizer.listen(source, timeout=5, phrase_time_limit=5)
+    return recognizer.recognize_google(audio)
+
+def main():
+    st.title("AI-based Speech Translator")
+
+    api_key = load_environment()
+    model = initialize_model(api_key)
+    chain = create_translation_chain(model)
+
+    # Dropdown for input language
+    input_language = st.selectbox("Select input language", ("English", "Hindi", "Marathi", "Urdu"))
+    # Dropdown for output language
+    output_language = st.selectbox("Select output language", ("English", "Hindi", "Marathi", "Urdu"))
+
+    lang_code = {
+        'English': 'en',
+        'Hindi': 'hi',
+        'Marathi': 'mr',
+        'Urdu': 'ur'
+    }
+
+    if st.button("Translate"):
+        recognizer = sr.Recognizer()
+        with sr.Microphone() as source:
+            recognizer.adjust_for_ambient_noise(source)
+            st.write("Speak now...")
+            
+            try:
+                input_text = recognize_speech(recognizer, source)
+                st.write(f"Recognized: {input_text}")
+
+                translation = translate_text(chain, input_text, input_language, output_language)
+                st.write(f"Translation: {translation}")
+
+                audio_fp = text_to_speech(translation, lang_code[output_language])
+                st.audio(audio_fp, format='audio/mp3')
+
+            except sr.UnknownValueError:
+                st.write("Could not understand audio.")
+            except Exception as e:
+                st.write(f"An error occurred: {e}")
+
+if __name__ == "__main__":
+    main()
+<!---
+Zeeshankhan077/Zeeshankhan077 is a ✨ special ✨ repository because its `README.md` (this file) appears on your GitHub profile.
+You can click the Preview link to take a look at your changes.
+--->
